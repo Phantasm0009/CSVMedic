@@ -1,5 +1,9 @@
 # csvmedic
 
+[![PyPI](https://img.shields.io/pypi/v/csvmedic)](https://pypi.org/project/csvmedic/)
+[![Python](https://img.shields.io/pypi/pyversions/csvmedic)](https://pypi.org/project/csvmedic/)
+[![License](https://img.shields.io/pypi/l/csvmedic)](https://github.com/Phantasm0009/CSVMedic/blob/main/LICENSE)
+
 Automatic locale-aware CSV and Excel reader. One line to clean messy data:
 
 ```python
@@ -8,6 +12,9 @@ import csvmedic
 df = csvmedic.read("messy_file.csv")
 print(df.diagnosis)  # See what was detected and converted
 ```
+
+![csvmedic demo](docs/demo.gif)  
+*Add a 30s terminal GIF here (see "Recording the demo GIF" below).*
 
 ## What it does
 
@@ -94,6 +101,45 @@ print(result.sample_differences)  # Example (row, column, pandas_val, csvmedic_v
 ## How disambiguation works
 
 For ambiguous dates like `03/04/2025` (March 4 or April 3?), csvmedic uses the data itself: if any value has a day > 12 (e.g. `25/03/2025`), the column is treated as day-first. It also uses cross-column inference, separator hints (e.g. period = European), and sequential order. If it still can’t decide, the column stays as string and is marked ambiguous in the diagnosis.
+
+## Recording the demo GIF
+
+Record a ~30s terminal session for the README (e.g. with [asciinema](https://asciinema.org/) or [terminalizer](https://github.com/terminalizer/terminalizer)), then convert to GIF.
+
+1. Install: `pip install csvmedic`
+2. From the repo root (so `tests/fixtures/german_semicolon.csv` is reachable), copy the file:  
+   `cp tests/fixtures/german_semicolon.csv .`
+3. Record this session:
+
+```bash
+$ pip install csvmedic
+$ python
+>>> import csvmedic
+>>> df = csvmedic.read("german_semicolon.csv")
+>>> print(df.diagnosis)
+```
+
+Expected output (shape of the diagnosis):
+
+```
+csvmedic Diagnosis (0.08s)
+  Encoding: windows-1252 (confidence: 95%)
+  Delimiter: ';'
+  Shape: 3 rows × 5 columns
+
+  — Kunden-Nr: string (confidence: 100%, preserved)
+      reason: leading_zeros_detected
+  ✓ Datum: date (confidence: 97%, converted)
+      format_detected: %d.%m.%Y
+      dayfirst: True
+  ✓ Umsatz: float (confidence: 95%, converted)
+      locale_detected: de_DE
+  ✓ Aktiv: boolean (confidence: 95%, converted)
+>>> df.head()
+```
+
+4. Convert the recording to GIF (e.g. `asciinema cast → gif` or terminalizer’s GIF export).
+5. Save as `docs/demo.gif` and commit. The README already references it above.
 
 ## Documentation
 

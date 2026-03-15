@@ -115,9 +115,7 @@ class MedicReader:
             delimiter = schema_profile.delimiter_detected
             has_header = schema_profile.has_header
         else:
-            dialect_result = detect_dialect(
-                None, encoding, sample_text=decoded_sample
-            )
+            dialect_result = detect_dialect(None, encoding, sample_text=decoded_sample)
             delimiter = dialect_result.delimiter
             has_header = dialect_result.has_header
 

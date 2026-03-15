@@ -8,9 +8,7 @@ from csvmedic.diagnosis import TransformationRecord
 from csvmedic.models import ColumnProfile, DetectedType
 
 
-def _parse_value(
-    value: str, fmt: str | None, dayfirst: bool | None
-) -> pd.Timestamp | None:
+def _parse_value(value: str, fmt: str | None, dayfirst: bool | None) -> pd.Timestamp | None:
     """Parse a single value to datetime. Returns None on failure."""
     if not value or not str(value).strip():
         return None

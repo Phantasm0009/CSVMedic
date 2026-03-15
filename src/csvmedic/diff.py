@@ -40,9 +40,7 @@ class DiffResult:
         if self.row_count_difference or self.column_count_difference:
             lines.append("  ⚠ Row or column count differs (pandas may have misparsed).")
         if self.columns_with_differences:
-            lines.append(
-                f"  Columns with value differences: {self.columns_with_differences}"
-            )
+            lines.append(f"  Columns with value differences: {self.columns_with_differences}")
             if self.sample_differences:
                 lines.append("  Sample value differences (row, column, pandas, csvmedic):")
                 for row_idx, col, pval, cval in self.sample_differences[: self.max_sample_rows]:
@@ -130,9 +128,7 @@ def diff(
     col_diff = list(pandas_df.columns) != list(csvmedic_df.columns) or len(
         pandas_df.columns
     ) != len(csvmedic_df.columns)
-    cols_with_diffs, sample_diffs = _find_differences(
-        pandas_df, csvmedic_df, max_sample=5
-    )
+    cols_with_diffs, sample_diffs = _find_differences(pandas_df, csvmedic_df, max_sample=5)
 
     return DiffResult(
         filepath=path_str,

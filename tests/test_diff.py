@@ -34,12 +34,8 @@ def test_diff_leading_zeros_shows_difference() -> None:
     # csvmedic preserves leading zeros
     assert result.csvmedic_df["product_id"].iloc[0] == "00742"
     # So there should be a column difference or sample difference
-    has_diff = (
-        "product_id" in result.columns_with_differences
-        or any(
-            col == "product_id"
-            for (_, col, _, _) in result.sample_differences
-        )
+    has_diff = "product_id" in result.columns_with_differences or any(
+        col == "product_id" for (_, col, _, _) in result.sample_differences
     )
     assert has_diff or result.pandas_df["product_id"].iloc[0] != "00742"
 

@@ -39,8 +39,8 @@ def test_read_batch_list_of_paths() -> None:
 def test_read_batch_consensus_encoding_delimiter() -> None:
     """With use_consensus=True, all files get same encoding/delimiter from majority."""
     paths = [
-        FIXTURES_DIR / "german_semicolon.csv",
-        FIXTURES_DIR / "german_semicolon.csv",
+        FIXTURES_DIR / "european_export.csv",
+        FIXTURES_DIR / "european_export.csv",
     ]
     paths = [p for p in paths if p.exists()]
     if not paths:

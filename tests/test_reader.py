@@ -25,19 +25,18 @@ def test_read_simple_us_csv(simple_us_csv: Path) -> None:
     assert diagnosis.file_profile.row_count == 3
 
 
-def test_read_german_semicolon() -> None:
-    """Read German semicolon CSV; verify delimiter and encoding detection."""
-    path = FIXTURES_DIR / "german_semicolon.csv"
+def test_read_european_export() -> None:
+    """Read European-format CSV (semicolon, cp1252); verify delimiter and encoding detection."""
+    path = FIXTURES_DIR / "european_export.csv"
     if not path.exists():
         pytest.skip("fixture not found")
     df = csvmedic.read(path)
     assert isinstance(df, pd.DataFrame)
-    assert list(df.columns) == ["Kunden-Nr", "Name", "Datum", "Umsatz", "Aktiv"]
+    assert list(df.columns) == ["Customer-ID", "Name", "Date", "Revenue", "Active"]
     assert len(df) == 3
     diagnosis = df.attrs.get("diagnosis")
     assert diagnosis is not None
     assert diagnosis.file_profile.delimiter_detected == ";"
-    # European single-byte encoding (cp1252, cp1250, mac_latin2, etc.) is acceptable
     enc = diagnosis.file_profile.encoding_detected.lower()
     assert any(x in enc for x in ("1252", "1250", "windows", "cp125", "mac_latin", "latin"))
 
@@ -73,19 +72,18 @@ def test_leading_zeros_preserved() -> None:
     assert df["product_id"].iloc[0] == "00742"
 
 
-def test_full_german_export() -> None:
-    """Semicolon, Windows-1252, DD.MM.YYYY dates, European numbers, Ja/Nein in one file."""
-    path = FIXTURES_DIR / "german_semicolon.csv"
+def test_full_european_export() -> None:
+    """Semicolon, cp1252, DD.MM.YYYY dates, European numbers, Ja/Nein in one file."""
+    path = FIXTURES_DIR / "european_export.csv"
     if not path.exists():
         pytest.skip("fixture not found")
     df = csvmedic.read(path)
-    assert list(df.columns) == ["Kunden-Nr", "Name", "Datum", "Umsatz", "Aktiv"]
+    assert list(df.columns) == ["Customer-ID", "Name", "Date", "Revenue", "Active"]
     assert len(df) == 3
     diagnosis = df.attrs.get("diagnosis")
     assert diagnosis is not None
     assert diagnosis.file_profile.delimiter_detected == ";"
-    # Kunden-Nr preserved (leading zeros), Datum converted to date, Umsatz to number, Aktiv to bool
-    assert df["Kunden-Nr"].iloc[0] == "00742"
+    assert df["Customer-ID"].iloc[0] == "00742"
 
 
 def test_preserve_strings_kwarg_does_not_break_read(simple_us_csv: Path) -> None:

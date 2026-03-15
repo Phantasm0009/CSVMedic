@@ -50,3 +50,6 @@ dmypy.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Terminalizer (recording source; keep docs/demo.gif)
+demo.yml

@@ -29,8 +29,10 @@ def _read_sample_text(
 
 
 def detect_dialect(
-    filepath_or_buffer: str | Path | IO[bytes],
+    filepath_or_buffer: str | Path | IO[bytes] | None,
     encoding: str,
+    *,
+    sample_text: str | None = None,
 ) -> DialectResult:
     """
     Detect CSV dialect (delimiter, quote char, has_header).
@@ -40,16 +42,23 @@ def detect_dialect(
 
     Parameters
     ----------
-    filepath_or_buffer : str, Path, or file-like
-        Path or open buffer (bytes or text).
+    filepath_or_buffer : str, Path, file-like, or None
+        Path or open buffer. Can be None if sample_text is provided.
     encoding : str
         Encoding to use when reading from path or bytes buffer.
+    sample_text : str, optional
+        Pre-decoded text to use instead of reading from filepath_or_buffer (avoids 2nd I/O).
 
     Returns
     -------
     DialectResult
     """
-    sample = _read_sample_text(filepath_or_buffer, encoding)
+    if sample_text is not None:
+        sample = sample_text
+    elif filepath_or_buffer is not None:
+        sample = _read_sample_text(filepath_or_buffer, encoding)
+    else:
+        sample = ""
 
     if not sample.strip():
         return DialectResult(delimiter=",", quotechar='"', has_header=True)

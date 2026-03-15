@@ -43,7 +43,6 @@ def apply_boolean_conversion(
     rows_affected = mapped.notna().sum()
     rows_failed = mapped.isna().sum() - series.isin(["", "nan"]).sum()
 
-    df = df.copy()
     df[col_name] = mapped
 
     record = TransformationRecord(

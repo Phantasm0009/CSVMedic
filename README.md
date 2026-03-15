@@ -58,6 +58,39 @@ print(profile.summary())
 print(profile.columns["Date"].details)
 ```
 
+## Schema pinning (recurring files)
+
+Save the detected schema after the first read and reuse it so the next read skips detection:
+
+```python
+df = csvmedic.read("monthly_export.csv")
+csvmedic.save_schema(df.attrs["diagnosis"].file_profile, "monthly_export.csvmedic.json")
+
+# Next time: same encoding, delimiter, and column types, no re-detection
+df2 = csvmedic.read("monthly_export.csv", schema="monthly_export.csvmedic.json")
+```
+
+## Batch read with consensus
+
+When reading many similar CSVs (e.g. one per month), use consensus so every file gets the same encoding and delimiter:
+
+```python
+dfs = csvmedic.read_batch(["jan.csv", "feb.csv", "mar.csv"], use_consensus=True)
+# Encoding and delimiter are chosen by majority across the three files.
+```
+
+## Diff: pandas vs csvmedic
+
+See exactly what pandas would have changed or corrupted vs what csvmedic preserves:
+
+```python
+result = csvmedic.diff("leading_zeros.csv")
+print(result.summary())           # Columns/rows that differ
+print(result.pandas_df)           # Default pandas read
+print(result.csvmedic_df)         # csvmedic read (e.g. keeps "00742" as string)
+print(result.sample_differences)  # Example (row, column, pandas_val, csvmedic_val)
+```
+
 ## How disambiguation works
 
 For ambiguous dates like `03/04/2025` (March 4 or April 3?), csvmedic uses the data itself: if any value has a day > 12 (e.g. `25/03/2025`), the column is treated as day-first. It also uses cross-column inference, separator hints (e.g. period = European), and sequential order. If it still can’t decide, the column stays as string and is marked ambiguous in the diagnosis.

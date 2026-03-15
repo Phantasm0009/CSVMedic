@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import cast
 
 
 class DetectedType(Enum):
@@ -50,6 +51,19 @@ class ColumnProfile:
             "details": self.details,
         }
 
+    @classmethod
+    def from_dict(cls, d: dict[str, object]) -> ColumnProfile:
+        """Deserialize from dictionary (e.g. from JSON schema)."""
+        details = d.get("details", {})
+        return cls(
+            name=str(d["name"]),
+            original_dtype=str(d["original_dtype"]),
+            detected_type=DetectedType(str(d["detected_type"])),
+            confidence=cast(float, d["confidence"]),
+            action=Action(str(d["action"])),
+            details=dict(cast(dict[str, object], details)) if isinstance(details, dict) else {},
+        )
+
 
 @dataclass
 class FileProfile:
@@ -85,4 +99,28 @@ class FileProfile:
             f"FileProfile(encoding={self.encoding_detected!r}, "
             f"delimiter={self.delimiter_detected!r}, "
             f"rows={self.row_count}, columns={self.column_count})"
+        )
+
+    @classmethod
+    def from_dict(cls, d: dict[str, object]) -> FileProfile:
+        """Deserialize from dictionary (e.g. from JSON schema)."""
+        columns_raw = d.get("columns", {})
+        if not isinstance(columns_raw, dict):
+            columns_raw = {}
+        columns = {
+            str(k): ColumnProfile.from_dict(v)
+            for k, v in columns_raw.items()
+            if isinstance(v, dict)
+        }
+        warnings_val = d.get("warnings", [])
+        return cls(
+            filepath=str(d["filepath"]) if d.get("filepath") else None,
+            encoding_detected=str(d["encoding_detected"]),
+            encoding_confidence=cast(float, d["encoding_confidence"]),
+            delimiter_detected=str(d["delimiter_detected"]),
+            has_header=bool(d.get("has_header", True)),
+            row_count=cast(int, d.get("row_count", 0)),
+            column_count=cast(int, d.get("column_count", len(columns))),
+            columns=columns,
+            warnings=list(warnings_val) if isinstance(warnings_val, list) else [],
         )

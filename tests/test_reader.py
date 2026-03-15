@@ -86,3 +86,14 @@ def test_full_german_export() -> None:
     assert diagnosis.file_profile.delimiter_detected == ";"
     # Kunden-Nr preserved (leading zeros), Datum converted to date, Umsatz to number, Aktiv to bool
     assert df["Kunden-Nr"].iloc[0] == "00742"
+
+
+def test_preserve_strings_kwarg_does_not_break_read(simple_us_csv: Path) -> None:
+    """preserve_strings must be popped before pd.read_csv; using it must not raise TypeError."""
+    df = csvmedic.read(simple_us_csv, preserve_strings=["id"])
+    assert isinstance(df, pd.DataFrame)
+    diagnosis = df.attrs.get("diagnosis")
+    assert diagnosis is not None
+    col = diagnosis.file_profile.columns.get("id")
+    assert col is not None
+    assert col.action == Action.PRESERVED

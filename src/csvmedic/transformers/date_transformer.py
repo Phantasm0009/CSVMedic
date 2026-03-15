@@ -57,7 +57,6 @@ def apply_date_conversion(
     rows_affected = converted.notna().sum()
     rows_failed = converted.isna().sum() - series.isin(["", "nan", "None"]).sum()
 
-    df = df.copy()
     df[col_name] = pd.to_datetime(converted, errors="coerce")
 
     record = TransformationRecord(

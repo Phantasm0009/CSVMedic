@@ -9,24 +9,36 @@ from typing import IO
 
 from csvmedic.exceptions import EncodingDetectionError
 
+# Default sample size for encoding detection (avoid loading multi-GB files into RAM).
+DEFAULT_ENCODING_SAMPLE_BYTES = 512 * 1024  # 512 KiB
 
-def _get_bytes(filepath_or_buffer: str | Path | IO[bytes] | bytes) -> bytes:
-    """Read raw bytes from path or buffer."""
+
+def _get_bytes(
+    filepath_or_buffer: str | Path | IO[bytes] | bytes,
+    sample_size: int | None = None,
+) -> bytes:
+    """Read raw bytes from path or buffer. If sample_size is set, read at most that many bytes."""
     if isinstance(filepath_or_buffer, bytes):
+        if sample_size is not None and len(filepath_or_buffer) > sample_size:
+            return filepath_or_buffer[:sample_size]
         return filepath_or_buffer
     if isinstance(filepath_or_buffer, (str, Path)):
         path = Path(filepath_or_buffer)
         if not path.exists():
             raise EncodingDetectionError(f"File not found: {path}")
-        return path.read_bytes()
+        with open(path, "rb") as f:
+            return f.read(sample_size) if sample_size else f.read()
     # file-like
-    raw = filepath_or_buffer.read()
+    raw = filepath_or_buffer.read(sample_size) if sample_size else filepath_or_buffer.read()
     if isinstance(raw, str):
         return raw.encode("utf-8")
     return raw
 
 
-def detect_encoding(filepath_or_buffer: str | Path | IO[bytes] | bytes) -> EncodingResult:
+def detect_encoding(
+    filepath_or_buffer: str | Path | IO[bytes] | bytes,
+    sample_size: int | None = DEFAULT_ENCODING_SAMPLE_BYTES,
+) -> EncodingResult:
     """
     Detect encoding of a CSV file or buffer.
 
@@ -41,8 +53,10 @@ def detect_encoding(filepath_or_buffer: str | Path | IO[bytes] | bytes) -> Encod
         confidence : float
             Confidence score 0.0 to 1.0.
     """
+    # When input is already bytes, use it all; otherwise cap read to sample_size.
+    read_size = None if isinstance(filepath_or_buffer, bytes) else sample_size
     try:
-        raw = _get_bytes(filepath_or_buffer)
+        raw = _get_bytes(filepath_or_buffer, read_size)
     except OSError as e:
         raise EncodingDetectionError(f"Cannot read file: {e}") from e
 

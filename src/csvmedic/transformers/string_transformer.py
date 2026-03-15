@@ -18,7 +18,6 @@ def apply_string_cleaning(
     series = df[col_name].astype(str).str.strip()
     rows_affected = series.notna().sum()
 
-    df = df.copy()
     df[col_name] = series
 
     record = TransformationRecord(

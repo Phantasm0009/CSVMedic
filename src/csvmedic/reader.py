@@ -1,9 +1,13 @@
 """
 Main orchestrator: encoding -> dialect -> read with dtype=str -> per-column detection -> diagnosis.
+
+Read-once pipeline: read byte sample (or full for non-seekable) once; use for encoding and
+dialect; then pandas reads from path/buffer (or StringIO(decoded) if source was consumed).
 """
 
 from __future__ import annotations
 
+import io
 import time
 from pathlib import Path
 from typing import IO, Any, cast
@@ -13,14 +17,43 @@ import pandas as pd
 from csvmedic.detectors.booleans import detect_boolean_column
 from csvmedic.detectors.dates import detect_date_column
 from csvmedic.detectors.dialect import detect_dialect
-from csvmedic.detectors.encoding import detect_encoding
+from csvmedic.detectors.encoding import (
+    DEFAULT_ENCODING_SAMPLE_BYTES,
+    detect_encoding,
+)
 from csvmedic.detectors.numbers import detect_number_column
 from csvmedic.detectors.strings import detect_string_preservation
 from csvmedic.diagnosis import Diagnosis, TransformationRecord
 from csvmedic.models import Action, ColumnProfile, DetectedType, FileProfile
+from csvmedic.schema import load_schema
 from csvmedic.transformers.boolean_transformer import apply_boolean_conversion
 from csvmedic.transformers.date_transformer import apply_date_conversion
 from csvmedic.transformers.number_transformer import apply_number_conversion
+
+
+def _read_byte_sample(
+    filepath_or_buffer: str | Path | IO[bytes],
+    sample_size: int = DEFAULT_ENCODING_SAMPLE_BYTES,
+) -> tuple[bytes, bool]:
+    """
+    Read bytes from path or buffer. Returns (bytes, use_decoded_for_csv).
+    use_decoded_for_csv is True when the source was fully consumed (non-seekable buffer),
+    so the caller must pass decoded content to pandas via StringIO.
+    """
+    if isinstance(filepath_or_buffer, (str, Path)):
+        path = Path(filepath_or_buffer)
+        with open(path, "rb") as f:
+            return (f.read(sample_size), False)
+    # file-like
+    buf = filepath_or_buffer
+    seekable = getattr(buf, "seek", None) is not None and callable(buf.seek)
+    if seekable:
+        raw = buf.read(sample_size)
+        buf.seek(0)
+        return (raw if isinstance(raw, bytes) else raw.encode("utf-8"), False)
+    # Non-seekable: read all (single read, then use decoded for dialect + pandas)
+    raw = buf.read()
+    return (raw if isinstance(raw, bytes) else raw.encode("utf-8"), True)
 
 
 class MedicReader:
@@ -46,47 +79,91 @@ class MedicReader:
         start_time = time.monotonic()
         transformations: list[TransformationRecord] = []
 
+        # Optional schema pinning: load FileProfile from path or use provided profile
+        schema_arg = kwargs.pop("schema", None)
+        schema_profile: FileProfile | None = None
+        if schema_arg is not None:
+            if isinstance(schema_arg, (str, Path)):
+                schema_profile = load_schema(schema_arg)
+            elif isinstance(schema_arg, FileProfile):
+                schema_profile = schema_arg
+            else:
+                raise TypeError("schema must be a path (str | Path) or FileProfile")
+
+        # Read once: byte sample (or full for non-seekable buffer); reuse for encoding + dialect
+        bytes_sample, use_decoded_for_csv = _read_byte_sample(filepath_or_buffer)
+
         encoding_override = kwargs.pop("encoding", None)
         if encoding_override is not None:
             encoding = encoding_override
             encoding_confidence = 1.0
+        elif schema_profile is not None:
+            encoding = schema_profile.encoding_detected
+            encoding_confidence = schema_profile.encoding_confidence
         else:
-            enc_result = detect_encoding(filepath_or_buffer)
+            enc_result = detect_encoding(bytes_sample)
             encoding = enc_result.encoding
             encoding_confidence = enc_result.confidence
-            if hasattr(filepath_or_buffer, "seek"):
-                filepath_or_buffer.seek(0)
+
+        decoded_sample = bytes_sample.decode(encoding, errors="replace")
 
         delimiter_override = kwargs.pop("delimiter", None)
         if delimiter_override is not None:
             delimiter = delimiter_override
             has_header = True
+        elif schema_profile is not None:
+            delimiter = schema_profile.delimiter_detected
+            has_header = schema_profile.has_header
         else:
-            dialect_result = detect_dialect(filepath_or_buffer, encoding)
+            dialect_result = detect_dialect(
+                None, encoding, sample_text=decoded_sample
+            )
             delimiter = dialect_result.delimiter
             has_header = dialect_result.has_header
-            if hasattr(filepath_or_buffer, "seek"):
-                filepath_or_buffer.seek(0)
 
         na_values = kwargs.pop("na_values", None)
-        preserve_strings = kwargs.get("preserve_strings", None) or []
+        preserve_strings = kwargs.pop("preserve_strings", None) or []
         force_dayfirst = kwargs.pop("dayfirst", None)
 
-        df_raw: pd.DataFrame = pd.read_csv(
-            filepath_or_buffer,
-            encoding=encoding,
-            sep=delimiter,
-            dtype=str,
-            keep_default_na=True,
-            na_values=na_values,
-            header=0 if has_header else None,
-            **kwargs,
-        )
+        csv_source: str | Path | IO[bytes] | io.StringIO
+        if use_decoded_for_csv:
+            csv_source = io.StringIO(decoded_sample)
+            read_kw = {
+                "sep": delimiter,
+                "dtype": str,
+                "keep_default_na": True,
+                "na_values": na_values,
+                "header": 0 if has_header else None,
+                **kwargs,
+            }
+        else:
+            csv_source = filepath_or_buffer
+            read_kw = {
+                "encoding": encoding,
+                "sep": delimiter,
+                "dtype": str,
+                "keep_default_na": True,
+                "na_values": na_values,
+                "header": 0 if has_header else None,
+                **kwargs,
+            }
+
+        df_raw = pd.read_csv(csv_source, **read_kw)
 
         column_profiles: dict[str, ColumnProfile] = {}
         resolved_dayfirst: bool | None = None
 
         for col_name in df_raw.columns:
+            # Schema pinning: use cached column profile if present
+            if schema_profile is not None and col_name in schema_profile.columns:
+                column_profiles[col_name] = schema_profile.columns[col_name]
+                prof = schema_profile.columns[col_name]
+                if prof.detected_type in (DetectedType.DATE, DetectedType.DATETIME):
+                    dayfirst_val = prof.details.get("dayfirst")
+                    if resolved_dayfirst is None and dayfirst_val is not None:
+                        resolved_dayfirst = bool(dayfirst_val)
+                continue
+
             raw_col = df_raw[col_name].dropna().head(self.sample_rows).astype(str)
             sample: list[str] = [str(x) for x in raw_col]
 
@@ -258,6 +335,7 @@ def read(
     number_locale: str | None = None,
     dayfirst: bool | None = None,
     preserve_strings: list[str] | None = None,
+    schema: str | Path | FileProfile | None = None,
     sample_rows: int = 1000,
     confidence_threshold: float = 0.75,
     na_values: list[str] | None = None,
@@ -276,6 +354,8 @@ def read(
         kwargs["preserve_strings"] = preserve_strings
     if dayfirst is not None:
         kwargs["dayfirst"] = dayfirst
+    if schema is not None:
+        kwargs["schema"] = schema
     kwargs.update(pandas_kwargs)
     result = reader.read(filepath_or_buffer, **kwargs)
     return result

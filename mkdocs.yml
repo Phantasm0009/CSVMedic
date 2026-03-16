@@ -1,0 +1,21 @@
+site_name: csvmedic
+site_url: https://csvmedic.readthedocs.io
+repo_url: https://github.com/Phantasm0009/CSVMedic
+repo_name: Phantasm0009/CSVMedic
+
+theme:
+  name: material
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - How it works: how-it-works.md
+  - API reference: api-reference.md
+  - FAQ: faq.md

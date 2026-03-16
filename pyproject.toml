@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "csvmedic"
-version = "0.1.2"
+version = "0.1.3"
 description = "Automatic locale-aware CSV and Excel reader with encoding, delimiter, date format, and number locale detection."
 readme = "README.md"
 license = "MIT"
@@ -43,9 +43,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/csvmedic/csvmedic"
+Homepage = "https://github.com/Phantasm0009/CSVMedic"
 Documentation = "https://csvmedic.readthedocs.io"
-Repository = "https://github.com/csvmedic/csvmedic"
+Repository = "https://github.com/Phantasm0009/CSVMedic"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/csvmedic"]
